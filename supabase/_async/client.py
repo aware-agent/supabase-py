@@ -1,8 +1,8 @@
 import re
 from typing import Any, Dict, List, Optional, Union
 
-from gotrue import AsyncMemoryStorage
-from gotrue.types import AuthChangeEvent, Session
+from supabase_auth import AsyncMemoryStorage
+from supabase_auth.types import AuthChangeEvent, Session
 from httpx import Timeout
 from postgrest import (
     AsyncPostgrestClient,
@@ -58,9 +58,7 @@ class AsyncClient:
             raise SupabaseException("Invalid URL")
 
         # Check if the key is a valid JWT
-        if not re.match(
-            r"^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$", supabase_key
-        ):
+        if not re.match(r"^[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$", supabase_key):
             raise SupabaseException("Invalid API key")
 
         if options is None:
@@ -108,9 +106,7 @@ class AsyncClient:
             except Exception as err:
                 session_access_token = None
 
-            client.options.headers.update(
-                client._get_auth_headers(session_access_token)
-            )
+            client.options.headers.update(client._get_auth_headers(session_access_token))
 
         return client
 
@@ -143,9 +139,7 @@ class AsyncClient:
         """
         return self.postgrest.from_(table_name)
 
-    def rpc(
-        self, fn: str, params: Optional[Dict[Any, Any]] = None
-    ) -> AsyncRPCFilterRequestBuilder:
+    def rpc(self, fn: str, params: Optional[Dict[Any, Any]] = None) -> AsyncRPCFilterRequestBuilder:
         """Performs a stored procedure call.
 
         Parameters
@@ -197,9 +191,7 @@ class AsyncClient:
             )
         return self._functions
 
-    def channel(
-        self, topic: str, params: RealtimeChannelOptions = {}
-    ) -> AsyncRealtimeChannel:
+    def channel(self, topic: str, params: RealtimeChannelOptions = {}) -> AsyncRealtimeChannel:
         """Creates a Realtime channel with Broadcast, Presence, and Postgres Changes."""
         return self.realtime.channel(topic, params)
 
@@ -220,9 +212,7 @@ class AsyncClient:
         realtime_url: str, supabase_key: str, options: Optional[Dict[str, Any]]
     ) -> AsyncRealtimeClient:
         """Private method for creating an instance of the realtime-py client."""
-        return AsyncRealtimeClient(
-            realtime_url, token=supabase_key, params=options or {}
-        )
+        return AsyncRealtimeClient(realtime_url, token=supabase_key, params=options or {})
 
     @staticmethod
     def _init_storage_client(
@@ -270,13 +260,9 @@ class AsyncClient:
     def _create_auth_header(self, token: str):
         return f"Bearer {token}"
 
-    def _get_auth_headers(
-        self, authorization: Union[str, None] = None
-    ) -> Dict[str, str]:
+    def _get_auth_headers(self, authorization: Union[str, None] = None) -> Dict[str, str]:
         if authorization is None:
-            authorization = self.options.headers.get(
-                "Authorization", self._create_auth_header(self.supabase_key)
-            )
+            authorization = self.options.headers.get("Authorization", self._create_auth_header(self.supabase_key))
 
         """Helper method to get auth headers."""
         return {
@@ -284,9 +270,7 @@ class AsyncClient:
             "Authorization": authorization,
         }
 
-    def _listen_to_auth_events(
-        self, event: AuthChangeEvent, session: Union[Session, None]
-    ):
+    async def _listen_to_auth_events(self, event: AuthChangeEvent, session: Union[Session, None]):
         access_token = self.supabase_key
         if event in ["SIGNED_IN", "TOKEN_REFRESHED", "SIGNED_OUT"]:
             # reset postgrest and storage instance on event change
@@ -297,8 +281,8 @@ class AsyncClient:
 
         self.options.headers["Authorization"] = self._create_auth_header(access_token)
 
-        # set_auth is a coroutine, how to handle this?
-        self.realtime.set_auth(access_token)
+        # Await for the realtime client to set the auth token
+        await self.realtime.set_auth(access_token)
 
 
 async def create_client(
@@ -332,6 +316,4 @@ async def create_client(
     -------
     Client
     """
-    return await AsyncClient.create(
-        supabase_url=supabase_url, supabase_key=supabase_key, options=options
-    )
+    return await AsyncClient.create(supabase_url=supabase_url, supabase_key=supabase_key, options=options)
